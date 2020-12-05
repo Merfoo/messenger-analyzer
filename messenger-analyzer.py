@@ -115,7 +115,7 @@ def parse_messenger(messenger_directory):
             members = chat["members"]
 
             average_message_length = { name: data["average_message_length"] for name, data in members.items() }
-            save_singular_csv(f'{chat_filename}_avg_msg_len.csv', chat["title"], average_message_length)
+            save_singular_csv(f'{chat_filename}_average_message_length.csv', chat["title"], average_message_length)
             
             messages_sent = { name: data["messages_sent"] for name, data in members.items() }
             save_singular_csv(f'{chat_filename}_messages_sent.csv', chat["title"], messages_sent)
@@ -125,9 +125,9 @@ def parse_messenger(messenger_directory):
                 filename_prefix = f'{chat_filename}--{name_filename}'
 
                 save_singular_csv(f'{filename_prefix}_top_freq_words.csv', name, data["top_freq_words"])
-                save_singular_csv(f'{filename_prefix}_messages.csv', name, data["word_count"])
+                save_singular_csv(f'{filename_prefix}_word_count.csv', name, data["word_count"])
 
-                with open(f'{filename_prefix}_word_cloud.txt', "w", encoding="utf-8") as f:
+                with open(f'{filename_prefix}_messages.txt', "w", encoding="utf-8") as f:
                     for message in data["messages"]:
                         f.write(message + " ")
 
