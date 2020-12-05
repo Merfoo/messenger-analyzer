@@ -3,43 +3,46 @@ import json
 import os
 
 def parse_chat_directory(chat_directory):
-    chat = {
-        "title": "",
-        "members": {}
-    }
+    title = ""
+    members = {}
 
     for entry in os.scandir(chat_directory):
-        if entry.is_file():
-            data = None
+        if entry.is_dir():
+            continue
 
-            with open(entry.path, "r") as f:
-                data = json.load(f)
+        chat_data = None
 
-            chat["title"] = data["title"]
+        with open(entry.path, "r") as f:
+            chat_data = json.load(f)
 
-            for message in data["messages"]:
-                if "content" not in message or message["type"] != "Generic":
-                    continue
+        title = chat_data["title"]
 
-                sender = message["sender_name"]
+        for message in chat_data["messages"]:
+            if "content" not in message or message["type"] != "Generic":
+                continue
 
-                if sender not in chat["members"]:
-                    chat["members"][sender] = {
-                        "messages_sent": 0,
-                        "messages": {}
-                    }
+            sender = message["sender_name"]
 
-                chat["members"][sender]["messages_sent"] += 1
+            if sender not in members:
+                members[sender] = {
+                    "messages_sent": 0,
+                    "messages": {}
+                }
 
-                content = message["content"].split()
-     
-                for word in content:
-                    if word not in chat["members"][sender]["messages"]:
-                        chat["members"][sender]["messages"][word] = 0
+            members[sender]["messages_sent"] += 1
 
-                    chat["members"][sender]["messages"][word] += 1
+            content = message["content"].split()
+    
+            for word in content:
+                if word not in members[sender]["messages"]:
+                    members[sender]["messages"][word] = 0
 
-    return chat
+                members[sender]["messages"][word] += 1
+
+    return {
+        "title": title,
+        "members": members
+    }
 
 def parse_messenger(messenger_directory):
     inbox_dir = os.path.join(messenger_directory, "inbox")
