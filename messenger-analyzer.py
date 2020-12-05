@@ -16,17 +16,37 @@ def parse_chat_directory(chat_directory):
         with open(entry.path, "r") as f:
             chat_data = json.load(f)
 
-        chat_data["title"] = fix_text_encoding(chat_data["title"])
-        
-        title = chat_data["title"]
+        title = fix_text_encoding(chat_data["title"])
 
         for message in chat_data["messages"]:
             if "content" not in message or message["type"] != "Generic":
                 continue
 
-            sender = fix_text_encoding(message["sender_name"])
             content = fix_text_encoding(message["content"])
-            
+
+            exclude_message = False
+
+            exlusion_phrases = [
+                " set your nickname ",
+                " set the nickname for ",
+                " cleared the nickname ",
+                " created a poll: ",
+                " in the poll.",
+                "This poll is no longer available.",
+                " poll has multiple updates.",
+                " joined the video chat."
+            ]
+
+            for exlusion_phrase in exlusion_phrases:
+                if exlusion_phrase in content:
+                    exclude_message = True
+                    break
+
+            if exclude_message:
+                continue
+
+            sender = fix_text_encoding(message["sender_name"])
+                        
             if sender not in members:
                 members[sender] = {
                     "messages_sent": 0,
