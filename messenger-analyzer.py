@@ -187,6 +187,7 @@ def get_members_top_freq_words(members_word_counts, size):
     return members
 
 def get_members_message_times(chat_messages):
+    time_keys = [military_to_standard(i) for i in range(24)]
     members = {}
 
     for message in chat_messages:
@@ -197,10 +198,38 @@ def get_members_message_times(chat_messages):
         timestamp = message["timestamp"]
 
         if sender not in members:
-            members[sender] = { military_to_standard(i): 0 for i in range(24) }
+            members[sender] = { time_key: 0 for time_key in time_keys }
 
         time = get_pst_from_utc_timestamp(timestamp)
         members[sender][military_to_standard(time.hour)] += 1
+
+    return members
+
+def get_members_message_times_percentage(chat_messages):
+    time_keys = [military_to_standard(i) for i in range(24)]
+    time_sums = { time_key: 0 for time_key in time_keys }
+    members = {}
+
+    for message in chat_messages:
+        if message["type"] != "text":
+            continue
+    
+        sender = message["sender"]
+        timestamp = message["timestamp"]
+
+        if sender not in members:
+            members[sender] = { time_key: 0 for time_key in time_keys }
+
+        time = get_pst_from_utc_timestamp(timestamp)
+        time_key = military_to_standard(time.hour)
+
+        members[sender][time_key] += 1
+        time_sums[time_key] += 1
+
+    for time_key in time_keys:
+        for data in members.values():
+            if time_sums[time_key]:
+                data[time_key] = (data[time_key] / time_sums[time_key]) * 100
 
     return members
 
@@ -233,6 +262,7 @@ def parse_chat_directory(chat_directory):
     average_message_lengths = get_members_average_message_lengths(messages)
     top_freq_words = get_members_top_freq_words(word_counts, 10)
     message_times = get_members_message_times(chat_messages)
+    message_times_percentage = get_members_message_times_percentage(chat_messages)
 
     return {
         "title": chat_title,
@@ -242,7 +272,8 @@ def parse_chat_directory(chat_directory):
         "word_counts": word_counts,
         "average_message_lengths": average_message_lengths,
         "top_freq_words": top_freq_words,
-        "message_times": message_times
+        "message_times": message_times,
+        "message_times_percentage": message_times_percentage
     }
 
 def parse_messenger(messenger_directory):
@@ -273,13 +304,14 @@ def parse_messenger(messenger_directory):
                     for message in chat["messages"][name]:
                         f.write(message + " ")
 
-            message_times = chat["message_times"]
+            for prop in ["message_times", "message_times_percentage"]:
+                message_times = chat[prop]
 
-            with open(f'{chat_filename}_message_times.csv', "w", encoding="utf-8") as f:
-                f.write(f',{",".join(military_to_standard(i) for i in range(24))}\n')
+                with open(f'{chat_filename}_{prop}.csv', "w", encoding="utf-8") as f:
+                    f.write(f',{",".join(military_to_standard(i) for i in range(24))}\n')
 
-                for member, data in message_times.items():
-                    f.write(f'{member},{",".join([str(val) for val in data.values()])}\n')
+                    for member, data in message_times.items():
+                        f.write(f'{member},{",".join([str(val) for val in data.values()])}\n')
 
             print(chat["message_counts"])
 
