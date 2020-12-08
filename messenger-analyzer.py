@@ -30,44 +30,6 @@ def get_message_type(message):
     
     return "text"
 
-def get_top_freq_words(word_count, size):
-    top_freq_words = {}
-    idx = 0
-
-    word_exclusions = [
-        "a", "able", "about", "across", "after", "all", "almost", "also", "am", "among", "an",
-        "and", "any", "are", "as", "at", "be", "because", "been", "but", "by", "can", "cannot",
-        "could", "did", "do", "does", "either", "else", "ever", "every", "for", "from", "get",
-        "got", "had", "has", "have", "he", "her", "hers", "him", "his", "how", "however", "i", "im",
-        "if", "in", "into", "is", "it", "its", "just", "least", "let", "like", "likely", "may",
-        "me", "might", "most", "must", "my", "neither", "no", "nor", "not", "of", "off", "often",
-        "on", "only", "or", "other", "one", "our", "own", "rather", "said", "say", "says", "she", "should",
-        "since", "so", "some", "than", "that", "the", "their", "them", "then", "there", "these",
-        "they", "this", "tis", "to", "too", "twas", "us", "wants", "was", "we", "were", "what",
-        "when", "where", "which", "while", "who", "whom", "why", "will", "with", "would", "yet",
-        "you", "your"
-    ]
-
-    for word, count in word_count.items():
-        if word.lower() in word_exclusions:
-            continue
-
-        top_freq_words[word] = count
-        idx += 1
-
-        if idx >= size:
-            break
-
-    return top_freq_words
-
-def get_average_message_length(messages):
-    length = 0
-
-    for message in messages:
-        length += len(message.split())
-
-    return round(length / len(messages), 2)
-
 def parse_chat_messages(messages):
     parsed_messages = []
 
@@ -90,62 +52,157 @@ def parse_chat_messages(messages):
     return parsed_messages
 
 def get_chat_data(chat_directory):
-    chat_data = []
+    chat_data = {
+        "title": "",
+        "messages": []
+    }
 
     for entry in os.scandir(chat_directory):
         if entry.is_dir():
             continue
 
         with open(entry.path, "r") as f:
-            chat_data.append(json.load(f))
+            data = json.load(f)
+
+            chat_data["title"] = data["title"]
+            chat_data["messages"] += data["messages"]
 
     return chat_data
 
-def parse_chat_directory(chat_directory):
-    title = ""
+def get_members(chat_messages):
+    members = set()
+
+    for message in chat_messages:
+        if message["type"] != "text":
+            continue
+
+        sender = message["sender"]
+        members.add(sender)
+
+    return list(members)
+
+def get_members_message_counts(chat_messages):
     members = {}
 
-    for chat_data in get_chat_data(chat_directory):
-        title = fix_text_encoding(chat_data["title"])
-        messages = parse_chat_messages(chat_data["messages"])
+    for message in chat_messages:
+        if message["type"] != "text":
+            continue
 
-        for message in messages:
-            if message["type"] != "text":
-                continue
-        
-            content = message["content"]
-            sender = message["sender"]
+        sender = message["sender"]
 
-            if sender not in members:
-                members[sender] = {
-                    "messages_sent": 0,
-                    "messages": [],
-                    "word_count": {}
-                }
+        if sender not in members:
+            members[sender] = 0
 
-            members[sender]["messages_sent"] += 1
-            members[sender]["messages"].append(content)
+        members[sender] += 1
 
-            content = content.lower()
-            content = content.replace(",", "").replace("’", "").replace("'", "")
-            words = content.split()
+    return members
+
+def get_members_messages(chat_messages):
+    members = {}
+
+    for message in chat_messages:
+        if message["type"] != "text":
+            continue
     
-            for word in words:
-                if word not in members[sender]["word_count"]:
-                    members[sender]["word_count"][word] = 0
+        content = message["content"]
+        sender = message["sender"]
 
-                members[sender]["word_count"][word] += 1
+        if sender not in members:
+            members[sender] = []
 
-    for name in members.keys():
-        member_data = members[name]
+        members[sender].append(content)
 
-        member_data["average_message_length"] = get_average_message_length(member_data["messages"])
-        member_data["word_count"] = { k: v for k, v in sorted(member_data["word_count"].items(), key=lambda item: item[1], reverse=True) }
-        member_data["top_freq_words"] = get_top_freq_words(member_data["word_count"], 10)
+    return members
+
+def get_members_word_counts(chat_messages):
+    members = {}
+
+    for message in chat_messages:
+        if message["type"] != "text":
+            continue
+    
+        content = message["content"]
+        sender = message["sender"]
+
+        if sender not in members:
+            members[sender] = {}
+
+        content = content.lower()
+        content = content.replace(",", "").replace("’", "").replace("'", "")
+        words = content.split()
+
+        for word in words:
+            if word not in members[sender]:
+                members[sender][word] = 0
+
+            members[sender][word] += 1
+
+    for member in members.keys():
+        members[member] = { k: v for k, v in sorted(members[member].items(), key=lambda item: item[1], reverse=True) }
+
+    return members
+
+def get_members_average_message_lengths(members_messages):
+    members = {}
+
+    for name, messages in members_messages.items():
+        members[name] = round(sum(len(message.split()) for message in messages) / len(messages), 2)
+
+    return members
+
+def get_members_top_freq_words(members_word_counts, size):
+    word_exclusions = [
+        "a", "able", "about", "across", "after", "all", "almost", "also", "am", "among", "an",
+        "and", "any", "are", "as", "at", "be", "because", "been", "but", "by", "can", "cannot",
+        "could", "did", "do", "does", "either", "else", "ever", "every", "for", "from", "get",
+        "got", "had", "has", "have", "he", "her", "hers", "him", "his", "how", "however", "i", "im",
+        "if", "in", "into", "is", "it", "its", "just", "least", "let", "like", "likely", "may",
+        "me", "might", "most", "must", "my", "neither", "no", "nor", "not", "of", "off", "often",
+        "on", "only", "or", "other", "one", "our", "own", "rather", "said", "say", "says", "she", "should",
+        "since", "so", "some", "than", "that", "the", "their", "them", "then", "there", "these",
+        "they", "this", "tis", "to", "too", "twas", "us", "wants", "was", "we", "were", "what",
+        "when", "where", "which", "while", "who", "whom", "why", "will", "with", "would", "yet",
+        "you", "your"
+    ]
+
+    members = {}
+
+    for name, word_counts in members_word_counts.items():
+        members[name] = {}
+        idx = 0
+        
+        for word, count in word_counts.items():
+            if word.lower() in word_exclusions:
+                continue
+
+            members[name][word] = count
+            idx += 1
+
+            if idx >= size:
+                break
+
+    return members
+
+def parse_chat_directory(chat_directory):
+    chat_data = get_chat_data(chat_directory)
+    chat_title = fix_text_encoding(chat_data["title"])
+    chat_messages = parse_chat_messages(chat_data["messages"])
+
+    members = get_members(chat_messages)
+    message_counts = get_members_message_counts(chat_messages)
+    messages = get_members_messages(chat_messages)
+    word_counts = get_members_word_counts(chat_messages)
+    average_message_lengths = get_members_average_message_lengths(messages)
+    top_freq_words = get_members_top_freq_words(word_counts, 10)
 
     return {
-        "title": title,
-        "members": members
+        "title": chat_title,
+        "members": members,
+        "message_counts": message_counts,
+        "messages": messages,
+        "word_counts": word_counts,
+        "average_message_lengths": average_message_lengths,
+        "top_freq_words": top_freq_words
     }
 
 def parse_messenger(messenger_directory):
@@ -161,24 +218,22 @@ def parse_messenger(messenger_directory):
             chat_filename = "-".join(chat["title"].split())
             members = chat["members"]
 
-            average_message_length = { name: data["average_message_length"] for name, data in members.items() }
-            save_singular_csv(f'{chat_filename}_average_message_length.csv', chat["title"], average_message_length)
-            
-            messages_sent = { name: data["messages_sent"] for name, data in members.items() }
-            save_singular_csv(f'{chat_filename}_messages_sent.csv', chat["title"], messages_sent)
-
-            for name, data in members.items():
+            for prop in ["message_counts", "average_message_lengths"]:
+                member_data = { name: data for name, data in chat[prop].items() }
+                save_singular_csv(f'{chat_filename}_{prop}.csv', chat["title"], member_data)
+                
+            for name in members:
                 name_filename = "_".join(name.split())
                 filename_prefix = f'{chat_filename}--{name_filename}'
 
-                save_singular_csv(f'{filename_prefix}_top_freq_words.csv', name, data["top_freq_words"])
-                save_singular_csv(f'{filename_prefix}_word_count.csv', name, data["word_count"])
+                for prop in ["word_counts", "top_freq_words"]:
+                    save_singular_csv(f'{filename_prefix}_{prop}.csv', name, chat[prop][name])
 
                 with open(f'{filename_prefix}_messages.txt', "w", encoding="utf-8") as f:
-                    for message in data["messages"]:
+                    for message in chat["messages"][name]:
                         f.write(message + " ")
 
-            print(messages_sent)
+            print(chat["message_counts"])
 
 def save_singular_csv(filename, rowname, data):
     with open(filename, "w", encoding="utf-8") as f:
