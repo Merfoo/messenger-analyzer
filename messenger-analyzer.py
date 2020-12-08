@@ -17,6 +17,9 @@ def get_message_type(message):
         ],
         "video": [
             " joined the video chat."
+        ],
+        "group_photo": [
+            " changed the group photo."
         ]
     }
 
