@@ -1,6 +1,9 @@
 import argparse
 import json
+import pytz
 import os
+
+from datetime import datetime
 
 def get_message_type(message):
     phrases = {
@@ -183,6 +186,41 @@ def get_members_top_freq_words(members_word_counts, size):
 
     return members
 
+def get_members_message_times(chat_messages):
+    members = {}
+
+    for message in chat_messages:
+        if message["type"] != "text":
+            continue
+    
+        sender = message["sender"]
+        timestamp = message["timestamp"]
+
+        if sender not in members:
+            members[sender] = { military_to_standard(i): 0 for i in range(24) }
+
+        time = get_pst_from_utc_timestamp(timestamp)
+        members[sender][military_to_standard(time.hour)] += 1
+
+    return members
+
+def get_pst_from_utc_timestamp(timestamp):
+    date = datetime.fromtimestamp(timestamp / 1000)
+
+    return date.astimezone(pytz.timezone("US/Pacific"))
+
+def military_to_standard(hour):
+    if hour == 0:
+        return "12am"
+
+    elif hour < 12:
+        return f'{hour}am'
+
+    elif hour == 12:
+        return "12pm"
+
+    return f'{hour - 12}pm'
+
 def parse_chat_directory(chat_directory):
     chat_data = get_chat_data(chat_directory)
     chat_title = fix_text_encoding(chat_data["title"])
@@ -194,6 +232,7 @@ def parse_chat_directory(chat_directory):
     word_counts = get_members_word_counts(chat_messages)
     average_message_lengths = get_members_average_message_lengths(messages)
     top_freq_words = get_members_top_freq_words(word_counts, 10)
+    message_times = get_members_message_times(chat_messages)
 
     return {
         "title": chat_title,
@@ -202,7 +241,8 @@ def parse_chat_directory(chat_directory):
         "messages": messages,
         "word_counts": word_counts,
         "average_message_lengths": average_message_lengths,
-        "top_freq_words": top_freq_words
+        "top_freq_words": top_freq_words,
+        "message_times": message_times
     }
 
 def parse_messenger(messenger_directory):
@@ -232,6 +272,14 @@ def parse_messenger(messenger_directory):
                 with open(f'{filename_prefix}_messages.txt', "w", encoding="utf-8") as f:
                     for message in chat["messages"][name]:
                         f.write(message + " ")
+
+            message_times = chat["message_times"]
+
+            with open(f'{chat_filename}_message_times.csv', "w", encoding="utf-8") as f:
+                f.write(f',{",".join(military_to_standard(i) for i in range(24))}\n')
+
+                for member, data in message_times.items():
+                    f.write(f'{member},{",".join([str(val) for val in data.values()])}\n')
 
             print(chat["message_counts"])
 
