@@ -98,6 +98,8 @@ def get_members_message_counts(chat_messages):
 
         members[sender] += 1
 
+    members = { k: v for k, v in sorted(members.items(), key=lambda item: item[1], reverse=True) }
+
     return members
 
 def get_members_messages(chat_messages):
@@ -151,6 +153,7 @@ def get_members_average_message_lengths(members_messages):
     for name, messages in members_messages.items():
         members[name] = round(sum(len(message.split()) for message in messages) / len(messages), 2)
 
+    members = { k: v for k, v in sorted(members.items(), key=lambda item: item[1], reverse=True)}
     return members
 
 def get_members_top_freq_words(members_word_counts, size):
