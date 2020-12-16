@@ -119,7 +119,7 @@ def get_members_messages(chat_messages):
 
     return members
 
-def get_members_word_counts(chat_messages):
+def get_members_word_freqs(chat_messages):
     members = {}
 
     for message in chat_messages:
@@ -156,7 +156,7 @@ def get_members_average_message_lengths(members_messages):
     members = { k: v for k, v in sorted(members.items(), key=lambda item: item[1], reverse=True)}
     return members
 
-def get_members_top_freq_words(members_word_counts, size):
+def get_members_top_word_freqs(members_word_freqs, size):
     word_exclusions = [
         "a", "able", "about", "across", "after", "all", "almost", "also", "am", "among", "an",
         "and", "any", "are", "as", "at", "be", "because", "been", "but", "by", "can", "cannot",
@@ -173,11 +173,11 @@ def get_members_top_freq_words(members_word_counts, size):
 
     members = {}
 
-    for name, word_counts in members_word_counts.items():
+    for name, word_freqs in members_word_freqs.items():
         members[name] = {}
         idx = 0
         
-        for word, count in word_counts.items():
+        for word, count in word_freqs.items():
             if word.lower() in word_exclusions:
                 continue
 
@@ -260,9 +260,9 @@ def process_chat_data(chat_data):
     members = get_members(chat_messages)
     message_counts = get_members_message_counts(chat_messages)
     messages = get_members_messages(chat_messages)
-    word_counts = get_members_word_counts(chat_messages)
+    word_freqs = get_members_word_freqs(chat_messages)
     average_message_lengths = get_members_average_message_lengths(messages)
-    top_freq_words = get_members_top_freq_words(word_counts, 10)
+    top_word_freqs = get_members_top_word_freqs(word_freqs, 10)
     message_times = get_members_message_times(chat_messages)
     message_times_percentage = get_members_message_times_percentage(chat_messages)
 
@@ -271,9 +271,9 @@ def process_chat_data(chat_data):
         "members": members,
         "message_counts": message_counts,
         "messages": messages,
-        "word_counts": word_counts,
+        "word_freqs": word_freqs,
         "average_message_lengths": average_message_lengths,
-        "top_freq_words": top_freq_words,
+        "top_word_freqs": top_word_freqs,
         "message_times": message_times,
         "message_times_percentage": message_times_percentage
     }
@@ -305,7 +305,7 @@ def parse_messenger(messenger_directory, chat_title):
         name_filename = "_".join(name.split())
         filename_prefix = f'{chat_filename}--{name_filename}'
 
-        for prop in ["word_counts", "top_freq_words"]:
+        for prop in ["word_freqs", "top_word_freqs"]:
             save_singular_csv(f'{filename_prefix}_{prop}.csv', name, chat[prop][name])
 
         with open(f'{filename_prefix}_messages.txt', "w", encoding="utf-8") as f:
