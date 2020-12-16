@@ -67,7 +67,7 @@ def get_chat_data(chat_directory):
         with open(entry.path, "r") as f:
             data = json.load(f)
 
-            chat_data["title"] = data["title"]
+            chat_data["title"] = fix_text_encoding(data["title"])
             chat_data["messages"] += data["messages"]
 
     return chat_data
@@ -253,8 +253,7 @@ def military_to_standard(hour):
 
     return f'{hour - 12}pm'
 
-def parse_chat_directory(chat_directory):
-    chat_data = get_chat_data(chat_directory)
+def process_chat_data(chat_data):
     chat_title = fix_text_encoding(chat_data["title"])
     chat_messages = parse_chat_messages(chat_data["messages"])
 
@@ -279,44 +278,50 @@ def parse_chat_directory(chat_directory):
         "message_times_percentage": message_times_percentage
     }
 
-def parse_messenger(messenger_directory):
+def parse_messenger(messenger_directory, chat_title):
     inbox_dir = os.path.join(messenger_directory, "inbox")
-    chats = []
+    chat = None
 
     for entry in os.scandir(inbox_dir):
         if entry.is_dir():
-            chats.append(parse_chat_directory(entry.path))
+            chat_data = get_chat_data(entry.path)
 
-    for chat in chats:
-        if chat["title"] == "":
-            chat_filename = "-".join(chat["title"].split())
-            members = chat["members"]
+            if chat_data["title"] == chat_title:
+                chat = process_chat_data(chat_data)
+                break
 
-            for prop in ["message_counts", "average_message_lengths"]:
-                member_data = { name: data for name, data in chat[prop].items() }
-                save_singular_csv(f'{chat_filename}_{prop}.csv', chat["title"], member_data)
-                
-            for name in members:
-                name_filename = "_".join(name.split())
-                filename_prefix = f'{chat_filename}--{name_filename}'
+    if chat is None:
+        print(f'Chat "{chat_title}" not found')
+        return
 
-                for prop in ["word_counts", "top_freq_words"]:
-                    save_singular_csv(f'{filename_prefix}_{prop}.csv', name, chat[prop][name])
+    chat_filename = "-".join(chat["title"].split())
+    members = chat["members"]
 
-                with open(f'{filename_prefix}_messages.txt', "w", encoding="utf-8") as f:
-                    for message in chat["messages"][name]:
-                        f.write(message + " ")
+    for prop in ["message_counts", "average_message_lengths"]:
+        member_data = { name: data for name, data in chat[prop].items() }
+        save_singular_csv(f'{chat_filename}_{prop}.csv', chat["title"], member_data)
+        
+    for name in members:
+        name_filename = "_".join(name.split())
+        filename_prefix = f'{chat_filename}--{name_filename}'
 
-            for prop in ["message_times", "message_times_percentage"]:
-                message_times = chat[prop]
+        for prop in ["word_counts", "top_freq_words"]:
+            save_singular_csv(f'{filename_prefix}_{prop}.csv', name, chat[prop][name])
 
-                with open(f'{chat_filename}_{prop}.csv', "w", encoding="utf-8") as f:
-                    f.write(f',{",".join(military_to_standard(i) for i in range(24))}\n')
+        with open(f'{filename_prefix}_messages.txt', "w", encoding="utf-8") as f:
+            for message in chat["messages"][name]:
+                f.write(message + " ")
 
-                    for member, data in message_times.items():
-                        f.write(f'{member},{",".join([str(val) for val in data.values()])}\n')
+    for prop in ["message_times", "message_times_percentage"]:
+        message_times = chat[prop]
 
-            print(chat["message_counts"])
+        with open(f'{chat_filename}_{prop}.csv', "w", encoding="utf-8") as f:
+            f.write(f',{",".join(military_to_standard(i) for i in range(24))}\n')
+
+            for member, data in message_times.items():
+                f.write(f'{member},{",".join([str(val) for val in data.values()])}\n')
+
+    print(chat["message_counts"])
 
 def save_singular_csv(filename, rowname, data):
     with open(filename, "w", encoding="utf-8") as f:
@@ -330,8 +335,10 @@ def fix_text_encoding(text):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Parse and analyse messenger data")
     parser.add_argument("messenger_directory", help="Path to messenger directory")
+    parser.add_argument("chat_title", help="Title of the messenger chat")
 
     args = parser.parse_args()
     messenger_directory = args.messenger_directory
+    chat_title = args.chat_title
 
-    parse_messenger(messenger_directory)
+    parse_messenger(messenger_directory, chat_title)
