@@ -32,6 +32,8 @@ xxx_average_message_lengths.csv - Average message length (# of words) for all ch
 
 xxx_message_counts.csv - Number of messages sent by each chat participant
 
+xxx_message_monthly_counts.csv - Number of messages sent by each participant per month
+
 xxx_message_times_percentage.csv - Percentage of each hour's messages sent by a chat participant
 
 xxx_message_times.csv - Total number of messages sent in each hour by a chat participant

@@ -102,6 +102,96 @@ def get_members_message_counts(chat_messages):
 
     return members
 
+def get_monthly_counts_key_order(key):
+    months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec"
+    ]
+
+    month_orders = { month: idx for idx, month in enumerate(months) }
+    month, year = key.split(" ")
+
+    return (year, month_orders[month])
+
+def get_members_messages_monthly_counts(chat_messages, members):
+    months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec"
+    ]
+
+    monthly_counts = {}
+
+    min_month = len(months)
+    min_year = 9999
+    max_month = 0
+    max_year = 1970
+
+    for message in chat_messages:
+        if message["type"] != "text":
+            continue
+
+        sender = message["sender"]
+
+        time = get_pst_from_utc_timestamp(message["timestamp"])
+        month_idx = time.month - 1
+        year = time.year
+
+        month_year = f'{months[month_idx]} {year}'
+
+        if month_year not in monthly_counts:
+            monthly_counts[month_year] = {}
+
+        if sender not in monthly_counts[month_year]:
+            monthly_counts[month_year] = { member: 0 for member in members }
+
+        monthly_counts[month_year][sender] +=  1
+        
+        if year < min_year:
+            min_year = year
+            min_month = month_idx
+
+        elif year == min_year:
+            min_month = min(month_idx, min_month)
+            max_month = max(month_idx, max_month)
+
+        else:
+            max_year = year
+            max_month = month_idx
+
+    for year in range(min_year, max_year + 1):
+        beg_idx = min_month if year == min_year else 0
+        end_idx = max_month if year == max_year else len(months)
+
+        for month_idx in range(beg_idx, end_idx):
+            month_year = f'{months[month_idx]} {year}'
+
+            if month_year not in monthly_counts:
+                monthly_counts[month_year] = { member: 0 for member in members }
+    
+    monthly_counts = { month_year: monthly_counts[month_year] for month_year in sorted(monthly_counts.keys(), key=lambda key: get_monthly_counts_key_order(key)) }
+
+    return monthly_counts
+
 def get_members_messages(chat_messages):
     members = {}
 
@@ -259,6 +349,7 @@ def process_chat_data(chat_data):
 
     members = get_members(chat_messages)
     message_counts = get_members_message_counts(chat_messages)
+    monthly_counts = get_members_messages_monthly_counts(chat_messages, members)
     messages = get_members_messages(chat_messages)
     word_freqs = get_members_word_freqs(chat_messages)
     average_message_lengths = get_members_average_message_lengths(messages)
@@ -270,6 +361,7 @@ def process_chat_data(chat_data):
         "title": chat_title,
         "members": members,
         "message_counts": message_counts,
+        "monthly_counts": monthly_counts,
         "messages": messages,
         "word_freqs": word_freqs,
         "average_message_lengths": average_message_lengths,
@@ -320,6 +412,13 @@ def parse_messenger(messenger_directory, chat_title):
 
             for member, data in message_times.items():
                 f.write(f'{member},{",".join([str(val) for val in data.values()])}\n')
+
+    with open(f'{chat_filename}_message_monthly_counts.csv', 'w', encoding="utf-8") as f:
+        f.write(f',{",".join(chat["monthly_counts"].keys())}\n')
+
+        for member in members:
+            member_monthly_counts = [ str(chat["monthly_counts"][month_year][member]) for month_year in chat["monthly_counts"].keys() ]
+            f.write(f'{member},{",".join(member_monthly_counts)}\n')
 
     print(chat["message_counts"])
 
