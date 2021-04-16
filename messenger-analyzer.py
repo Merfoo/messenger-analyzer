@@ -159,10 +159,10 @@ def get_members_messages_monthly_counts(chat_messages, members):
         month_year = f'{months[month_idx]} {year}'
 
         if month_year not in monthly_counts:
-            monthly_counts[month_year] = {}
+            monthly_counts[month_year] = { member: 0 for member in members }
 
         if sender not in monthly_counts[month_year]:
-            monthly_counts[month_year] = { member: 0 for member in members }
+            monthly_counts[month_year][sender] = 0
 
         monthly_counts[month_year][sender] +=  1
         
@@ -191,6 +191,30 @@ def get_members_messages_monthly_counts(chat_messages, members):
     monthly_counts = { month_year: monthly_counts[month_year] for month_year in sorted(monthly_counts.keys(), key=lambda key: get_monthly_counts_key_order(key)) }
 
     return monthly_counts
+
+def get_members_messages_weekly_counts(chat_messages, members):
+    weekly_counts = {}
+
+    for message in chat_messages:
+        if message["type"] != "text":
+            continue
+        
+        sender = message["sender"]
+        
+        time = get_pst_from_utc_timestamp(message["timestamp"])
+        weekly_count = time.strftime("%U")
+
+        if weekly_count not in weekly_counts:
+            weekly_counts[weekly_count] = { member: 0 for member in members }
+
+        if sender not in weekly_counts[weekly_count]:
+            weekly_counts[weekly_count][sender] = 0
+
+        weekly_counts[weekly_count][sender] += 1
+
+    weekly_counts = { weekly_count: weekly_counts[weekly_count] for weekly_count in sorted(weekly_counts.keys(), key=lambda key: int(key)) }
+
+    return weekly_counts
 
 def get_members_messages(chat_messages):
     members = {}
@@ -350,6 +374,7 @@ def process_chat_data(chat_data):
     members = get_members(chat_messages)
     message_counts = get_members_message_counts(chat_messages)
     monthly_counts = get_members_messages_monthly_counts(chat_messages, members)
+    weekly_counts = get_members_messages_weekly_counts(chat_messages, members)
     messages = get_members_messages(chat_messages)
     word_freqs = get_members_word_freqs(chat_messages)
     average_message_lengths = get_members_average_message_lengths(messages)
@@ -362,6 +387,7 @@ def process_chat_data(chat_data):
         "members": members,
         "message_counts": message_counts,
         "monthly_counts": monthly_counts,
+        "weekly_counts": weekly_counts,
         "messages": messages,
         "word_freqs": word_freqs,
         "average_message_lengths": average_message_lengths,
@@ -413,12 +439,15 @@ def parse_messenger(messenger_directory, chat_title):
             for member, data in message_times.items():
                 f.write(f'{member},{",".join([str(val) for val in data.values()])}\n')
 
-    with open(f'{chat_filename}_message_monthly_counts.csv', 'w', encoding="utf-8") as f:
-        f.write(f',{",".join(chat["monthly_counts"].keys())}\n')
+    for prop in ["monthly_counts", "weekly_counts"]:
+        message_counts = chat[prop]
 
-        for member in members:
-            member_monthly_counts = [ str(chat["monthly_counts"][month_year][member]) for month_year in chat["monthly_counts"].keys() ]
-            f.write(f'{member},{",".join(member_monthly_counts)}\n')
+        with open(f'{chat_filename}_message_{prop}.csv', 'w', encoding="utf-8") as f:
+            f.write(f',{",".join(chat[prop].keys())}\n')
+
+            for member in members:
+                member_message_counts = [ str(chat[prop][key][member]) for key in chat[prop].keys() ]
+                f.write(f'{member},{",".join(member_message_counts)}\n')
 
     print(chat["message_counts"])
 
